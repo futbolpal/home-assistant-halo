@@ -1,0 +1,11 @@
+{
+  "domain": "halo",
+  "name": "Halo",
+  "documentation": "https://www.home-assistant.io/integrations/halo",
+  "version": "0.0.1",
+  "requirements": [
+	"requests>=2.18.4"
+  ],
+  "codeowners": ["futbolpal@gmail.com"],
+  "iot_class": "cloud_polling"
+}
