@@ -106,9 +106,6 @@ class HaloLight(LightEntity):
         else:
             self._device.turn_on()
             self._device.set_color_temp(5000)
-        _LOGGER.warning("Device state: %s", self._device._state)
-        _LOGGER.warning("Device brightness: %s", self._device.brightness)
-
 
     def turn_off(self, **kwargs):
         self._device.turn_off()
