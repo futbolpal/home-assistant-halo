@@ -6,7 +6,9 @@ LICENSE file for more details.
 import json
 import logging
 import requests
+import time
 
+REFRESH_CACHE_TTL_SECONDS = 3
 API_TIMEOUT = 10
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,24 +19,32 @@ class HaloDevice:
         self._pid = pid
         self._name = name
         self._is_group = is_group
+        self._last_updated = None
 
     def refresh(self):
+        if self._last_updated and time.time() - self._last_updated < REFRESH_CACHE_TTL_SECONDS:
+            return
         if self._is_group:
             self._state = self._api.get_group_state(self._pid)
         else:
             self._state = self._api.get_device_state(self._pid)
+        self._last_updated = time.time()
 
     def turn_on(self):
         self._state = self._api.turn_on(self._pid, self._is_group)
+        self._last_updated = time.time()
 
     def turn_off(self):
         self._state = self._api.turn_off(self._pid, self._is_group)
+        self._last_updated = time.time()
 
     def set_brightness(self, value):
         self._state = self._api.set_brightness(self._pid, value, self._is_group)
+        self._last_updated = time.time()
 
     def set_color_temp(self, k):
         self._state = self._api.set_color_temp(self._pid, k, self._is_group)
+        self._last_updated = time.time()
 
     @property
     def pid(self):
@@ -45,28 +55,43 @@ class HaloDevice:
         return self._name
 
     @property
-    def brightness(self):
-        _state_obj = next((x for x in self._state if x['name'] == 'dim'), None)
-        if _state_obj is None:
-            return None 
-        _brightness = json.loads(_state_obj['value'])[0]
-        if self.is_on:
-            return _brightness or 255
-        return 0
+    def is_on(self):
+        return self._is_on()
 
     @property
-    def is_on(self):
-        state_obj = next((x for x in self._state if x['name'] == 'on_off'), None)
-        if state_obj is None:
+    def brightness(self):
+        if not self._is_on():
+            return 0
+
+        _state_obj = self._state_brightness()
+        if _state_obj is None:
             return None 
-        return bool(json.loads(state_obj['value'])[0])
+
+        _brightness = json.loads(_state_obj['value'])[0]
+        return _brightness or 255
 
     @property
     def color_temp(self):
-        state_obj = next((x for x in self._state if x['name'] == 'white'), None)
-        if state_obj is None:
+        _state_obj = self._state_color_temp()
+        if _state_obj is None:
             return None 
-        return int(state_obj['humanized'])
+        return int(_state_obj['humanized'])
+
+    def _is_on(self):
+        _state_obj = self._state_on_off()
+        if _state_obj is None:
+            return None 
+        return bool(json.loads(_state_obj['value'])[0])
+
+    def _state_on_off(self):
+        return next((x for x in self._state if x['name'] == 'on_off'), None)
+
+    def _state_brightness(self):
+        return next((x for x in self._state if x['name'] == 'dim'), None)
+
+    def _state_color_temp(self):
+        return next((x for x in self._state if x['name'] == 'white'), None)
+
 
 class HaloGroup(HaloDevice):
     def __init__(self, api, name, pid):
@@ -106,14 +131,14 @@ class HaloApi:
         """Get a list of groups for a particular location."""
         headers = {'Authorization': 'Token {}'.format(self._auth_token)}
         r = requests.get(self.API_GROUPS.format(location=location_id),
-                         headers=headers, timeout=API_TIMEOUT)
+                headers=headers, timeout=API_TIMEOUT)
         return list(map(lambda g: HaloGroup(self, g['name'], g['pid']), r.json()['groups']))
 
     def get_devices(self, location_id):
         """Get a list of devices for a particular location."""
         headers = {'Authorization': 'Token {}'.format(self._auth_token)}
         r = requests.get(self.API_DEVICES.format(location=location_id),
-                         headers=headers, timeout=API_TIMEOUT)
+                headers=headers, timeout=API_TIMEOUT)
         return list(map(lambda d: HaloDevice(self, d['name'], d['pid']), [d for d in r.json()['abstract_devices'] if d['product_id'] == 162]))
 
     def turn_on(self, pid, is_group = False):
@@ -144,9 +169,9 @@ class HaloApi:
         data =  { 'state' : {'name': name, 'value': value}}
 
         r = requests.post(self.API_GROUP_STATE.format(pid=pid),
-                         headers=headers,
-                         json=data,
-                         timeout=API_TIMEOUT)
+                headers=headers,
+                json=data,
+                timeout=API_TIMEOUT)
         return r.json()['states']
 
     def set_device_state(self, pid, name, value):
@@ -154,21 +179,21 @@ class HaloApi:
         data =  { 'state' : {'name': name, 'value': value}}
 
         r = requests.post(self.API_DEVICE_STATE.format(pid=pid),
-                         headers=headers,
-                         json=data,
-                         timeout=API_TIMEOUT)
+                headers=headers,
+                json=data,
+                timeout=API_TIMEOUT)
         return r.json()['states']
 
     def get_group_state(self, pid):
         headers = {'Authorization': 'Token {}'.format(self._auth_token)}
         r = requests.get(self.API_GROUP_STATE.format(pid=pid),
-                         headers=headers,
-                         timeout=API_TIMEOUT)
+                headers=headers,
+                timeout=API_TIMEOUT)
         return r.json()['state']
 
     def get_device_state(self, pid):
         headers = {'Authorization': 'Token {}'.format(self._auth_token)}
         r = requests.get(self.API_DEVICE_STATE.format(pid=pid),
-                         headers=headers,
-                         timeout=API_TIMEOUT)
+                headers=headers,
+                timeout=API_TIMEOUT)
         return r.json()['state']
