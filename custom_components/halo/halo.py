@@ -6,6 +6,7 @@ LICENSE file for more details.
 import json
 import logging
 import requests
+import httpx
 import time
 
 REFRESH_CACHE_TTL_SECONDS = 3
@@ -20,6 +21,12 @@ class HaloDevice:
         self._name = name
         self._is_group = is_group
         self._last_updated = None
+
+    async def async_refresh(self):
+        if self._is_group:
+            self._state = await self._api.async_get_group_state(self._pid)
+        else:
+            self._state = await self._api.async_get_device_state(self._pid)
 
     def refresh(self):
         if self._last_updated and time.time() - self._last_updated < REFRESH_CACHE_TTL_SECONDS:
@@ -197,3 +204,26 @@ class HaloApi:
                 headers=headers,
                 timeout=API_TIMEOUT)
         return r.json()['state']
+
+    async def async_get_group_state(self, pid):
+        headers = {'Authorization': 'Token {}'.format(self._auth_token)}
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.get(self.API_GROUP_STATE.format(pid=pid),
+                        headers=headers,
+                        timeout=API_TIMEOUT)
+                return r.json()['state']
+        except (httpx.ReadTimeout):
+            _LOGGER.error("Failed to get group state due to timeout")
+
+    async def async_get_device_state(self, pid):
+        headers = {'Authorization': 'Token {}'.format(self._auth_token)}
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.get(self.API_DEVICE_STATE.format(pid=pid),
+                        headers=headers,
+                        timeout=API_TIMEOUT)
+                return r.json()['state']
+        except (httpx.ReadTimeout):
+            _LOGGER.error("Failed to get device state due to timeout")
+

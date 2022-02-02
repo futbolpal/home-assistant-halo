@@ -110,5 +110,9 @@ class HaloLight(LightEntity):
     def turn_off(self, **kwargs):
         self._device.turn_off()
 
-    def update(self):
-        self._device.refresh()
+#    def update(self):
+#        self._device.refresh()
+
+    async def async_update(self):
+        await self._device.async_refresh()
+ 
