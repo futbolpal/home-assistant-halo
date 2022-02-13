@@ -1,3 +1,4 @@
 *
 !custom_components/halo/**.py
 !custom_components/halo/**.json
+!custom_components/halo/**.md
