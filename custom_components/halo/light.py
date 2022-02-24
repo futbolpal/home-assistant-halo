@@ -111,6 +111,19 @@ class HaloLight(LightEntity):
     def turn_off(self, **kwargs):
         self._device.turn_off()
 
+    async def async_turn_on(self, **kwargs):
+        _LOGGER.warn("Asynn Turn on: %s", kwargs)
+        if ATTR_BRIGHTNESS in kwargs:
+            await self._device.async_set_brightness(kwargs.get(ATTR_BRIGHTNESS))
+        if ATTR_COLOR_TEMP in kwargs:
+            await self._device.async_set_color_temp(color_temperature_mired_to_kelvin(kwargs.get(ATTR_COLOR_TEMP)))
+        if not bool(kwargs):
+            await self._device.async_turn_on()
+            await self._device.async_set_color_temp(5000)
+
+    async def async_turn_off(self, **kwargs):
+        await self._device.async_turn_off()
+
     async def async_update(self):
         await self._device.async_refresh()
  

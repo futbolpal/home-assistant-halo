@@ -9,7 +9,7 @@ import requests
 import httpx
 import time
 
-REFRESH_CACHE_TTL_SECONDS = 3
+REFRESH_CACHE_TTL_SECONDS = 15
 API_TIMEOUT = 10
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,16 +37,32 @@ class HaloDevice:
             self._state = self._api.get_device_state(self._pid)
         self._last_updated = time.time()
 
+    async def async_turn_on(self):
+        await self._api.async_turn_on(self._pid, self._is_group)
+        #self._last_updated = time.time()
+
     def turn_on(self):
         self._state = self._api.turn_on(self._pid, self._is_group)
         self._last_updated = time.time()
+
+    async def async_turn_off(self):
+        await self._api.async_turn_off(self._pid, self._is_group)
+        #self._last_updated = time.time()
 
     def turn_off(self):
         self._state = self._api.turn_off(self._pid, self._is_group)
         self._last_updated = time.time()
 
+    async def async_set_brightness(self, value):
+        self._state = await self._api.async_set_brightness(self._pid, value, self._is_group)
+        self._last_updated = time.time()
+
     def set_brightness(self, value):
         self._state = self._api.set_brightness(self._pid, value, self._is_group)
+        self._last_updated = time.time()
+
+    async def async_set_color_temp(self, value):
+        self._state = await self._api.async_set_color_temp(self._pid, value, self._is_group)
         self._last_updated = time.time()
 
     def set_color_temp(self, k):
@@ -72,7 +88,7 @@ class HaloDevice:
 
         _state_obj = self._state_brightness()
         if _state_obj is None:
-            return None 
+            return None
 
         _brightness = json.loads(_state_obj['value'])[0]
         return _brightness or 255
@@ -81,13 +97,13 @@ class HaloDevice:
     def color_temp(self):
         _state_obj = self._state_color_temp()
         if _state_obj is None:
-            return None 
+            return None
         return int(_state_obj['humanized'])
 
     def _is_on(self):
         _state_obj = self._state_on_off()
         if _state_obj is None:
-            return None 
+            return None
         return bool(json.loads(_state_obj['value'])[0])
 
     def _state_on_off(self):
@@ -205,6 +221,58 @@ class HaloApi:
                 timeout=API_TIMEOUT)
         return r.json()['state']
 
+    async def async_turn_on(self, pid, is_group = False):
+        """Turns on a device or group"""
+        if is_group:
+            return await self.async_set_group_state(pid, 'on_off', '[1]')
+        return await self.async_set_device_state(pid, 'on_off', '[1]')
+
+    async def async_turn_off(self, pid, is_group = False):
+        """Turns off a device or group"""
+        if is_group:
+            return await self.async_set_group_state(pid, 'on_off', '[0]')
+        return await self.async_set_device_state(pid, 'on_off', '[0]')
+
+    async def async_set_brightness(self, pid, value, is_group = False):
+        """Dim a device or group"""
+        if is_group:
+            return await self.async_set_group_state(pid, 'dim', '[{}]'.format(value))
+        return await self.async_set_device_state(pid, 'dim', '[{}]'.format(value))
+
+    async def async_set_color_temp(self, pid, k, is_group = False):
+        if is_group:
+            return await self.async_set_group_state(pid, 'white', k)
+        return await self.async_set_device_state(pid, 'white', k)
+
+    async def async_set_group_state(self, pid, name, value):
+        headers = {'Authorization': 'Token {}'.format(self._auth_token)}
+        data =  { 'state' : {'name': name, 'value': value}}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                r = requests.post(self.API_GROUP_STATE.format(pid=pid),
+                        headers=headers,
+                        json=data,
+                        timeout=API_TIMEOUT)
+                return r.json()['states']
+        except (httpx.ReadTimeout):
+            _LOGGER.error("Failed to set group state due to timeout")
+
+    async def async_set_device_state(self, pid, name, value):
+        headers = {'Authorization': 'Token {}'.format(self._auth_token)}
+        data =  { 'state' : {'name': name, 'value': value}}
+
+        try:
+            async with httpx.AsyncClient() as client:
+                r = await client.post(self.API_DEVICE_STATE.format(pid=pid),
+                        headers=headers,
+                        json=data,
+                        timeout=API_TIMEOUT)
+                _LOGGER.error("Latest device state: %s", r.json())
+                return r.json()['states']
+        except (httpx.ReadTimeout):
+            _LOGGER.error("Failed to set device state due to timeout")
+
     async def async_get_group_state(self, pid):
         headers = {'Authorization': 'Token {}'.format(self._auth_token)}
         try:
@@ -226,4 +294,3 @@ class HaloApi:
                 return r.json()['state']
         except (httpx.ReadTimeout):
             _LOGGER.error("Failed to get device state due to timeout")
-
