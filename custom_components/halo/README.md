@@ -23,9 +23,7 @@ This core component uses the [Avi-on python library](https://github.com/mjg59/py
 
 ```
 halo:
-light:
-  - platform: halo
-    username: <your Halo app login email>
-    password: <your Halo app login password>
+  username: <your Halo app login email>
+  password: <your Halo app login password>
 ```
 4. Go to Configuration and restart HA

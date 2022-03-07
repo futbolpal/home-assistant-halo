@@ -1,6 +1,7 @@
 {
   "domain": "halo",
   "name": "Halo",
+  "config_flow": false,
   "documentation": "https://www.home-assistant.io/integrations/halo",
   "version": "0.0.1",
   "requirements": [

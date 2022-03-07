@@ -3,10 +3,7 @@ from __future__ import annotations
 
 import logging
 import importlib
-import time
-import voluptuous as vol
 
-from .halo import *
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP,
@@ -15,44 +12,35 @@ from homeassistant.components.light import (
     COLOR_MODE_BRIGHTNESS,
     LightEntity,
 )
-from homeassistant.const import (
-    CONF_PASSWORD,
-    CONF_USERNAME,
-)
 from homeassistant.core import HomeAssistant
 from homeassistant.util.color import color_temperature_mired_to_kelvin, color_temperature_kelvin_to_mired
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
-import homeassistant.helpers.config_validation as cv
-
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {
-        vol.Required(CONF_USERNAME): cv.string,
-        vol.Required(CONF_PASSWORD): cv.string,
-    }
-)
+from homeassistant.helpers.typing import DiscoveryInfoType
+from homeassistant.config_entries import ConfigEntry
+from .halo import *
+from .const import DOMAIN, PLATFORMS
 
 _LOGGER = logging.getLogger(__name__)
 
-def setup_platform(
+async def async_setup_entry(
     hass: HomeAssistant,
-    config: ConfigType,
+    config: ConfigEntry,
     add_entities: AddEntitiesCallback,
     discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Set up an Halo switch."""
+    api = hass.data[DOMAIN]
+
     lights = []
-    api = HaloApi(config[CONF_USERNAME], config[CONF_PASSWORD])
-    api.authenticate()
-    locations = api.get_locations()
+    locations = await hass.async_add_executor_job(api.get_locations)
     for location in locations:
-        devices = api.get_devices(location['pid'])
+        devices = await hass.async_add_executor_job(api.get_devices, location['pid'])
         for device in devices:
             lights.append(HaloLight(device))
-        groups = api.get_groups(location['pid'])
+        groups = await hass.async_add_executor_job(api.get_groups, location['pid'])
         for group in groups:
             lights.append(HaloLight(group))
-    add_entities(lights)
+    add_entities(lights, True)
 
 
 class HaloLight(LightEntity):
@@ -98,21 +86,8 @@ class HaloLight(LightEntity):
     def supported_color_modes(self):
         return {COLOR_MODE_COLOR_TEMP}
 
-    def turn_on(self, **kwargs):
-        _LOGGER.warn("Turn on: %s", kwargs)
-        if ATTR_BRIGHTNESS in kwargs:
-            self._device.set_brightness(kwargs.get(ATTR_BRIGHTNESS))
-        if ATTR_COLOR_TEMP in kwargs:
-            self._device.set_color_temp(color_temperature_mired_to_kelvin(kwargs.get(ATTR_COLOR_TEMP)))
-        if not bool(kwargs):
-            self._device.turn_on()
-            self._device.set_color_temp(5000)
-
-    def turn_off(self, **kwargs):
-        self._device.turn_off()
-
     async def async_turn_on(self, **kwargs):
-        _LOGGER.warn("Asynn Turn on: %s", kwargs)
+        _LOGGER.warn("Async Turn on: %s", kwargs)
         if ATTR_BRIGHTNESS in kwargs:
             await self._device.async_set_brightness(kwargs.get(ATTR_BRIGHTNESS))
         if ATTR_COLOR_TEMP in kwargs:
