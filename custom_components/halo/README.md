@@ -6,6 +6,10 @@ This custom component for Halo/Avi-on lights manages [HALO HOME HLB6 Series 6 in
 
 Instead of communicating through Bluetooth, this integration relies on the [Halo Access Bridge](https://www.amazon.com/Bluetooth-Enabled-Internet-Access-Halo/dp/B079TBGYZ7).
 
+## Avi-on API
+
+[Postman](https://documenter.getpostman.com/view/6065583/RzfmEmUY#61a21dee-d09d-48e3-b5c1-f7772e2e62a2)
+
 ## Alternatives
 
 [Home Assistant Core Component](https://github.com/home-assistant/core/tree/dev/homeassistant/components/avion)
